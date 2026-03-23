@@ -62,18 +62,7 @@ jobs:
           # AI 配置
           # ==========================================
           # LITELLM_CONFIG
-          # ========== 新增：通义千问配置 ==========
-          DASHSCOPE_API_KEY: ${{ secrets.LLM_QWEN_API_KEY }}  # 映射通义千问API Key
-          LLM_CHANNELS: ${{ secrets.LLM_CHANNELS }}          # 映射启用的模型渠道
-          LLM_QWEN_PROTOCOL: ${{ secrets.LLM_QWEN_PROTOCOL }}
-          LLM_QWEN_BASE_URL: ${{ secrets.LLM_QWEN_BASE_URL }}
-          LLM_QWEN_MODELS: ${{ secrets.LLM_QWEN_MODELS }}
-          LLM_QWEN_ENABLED: ${{ secrets.LLM_QWEN_ENABLED }}
-    # ========== 新增：钉钉配置 ==========
-          DINGTALK_WEBHOOK_URL: ${{ secrets.DINGTALK_WEBHOOK_URL }}  # 映射钉钉Webhook
-          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}            # 映射钉钉加签密钥
-    # ========== 新增：通知渠道 ==========
-          NOTIFICATION_CHANNELS: dingtalk  # 强制启用钉钉通知
+          
           LITELLM_CONFIG: ${{ vars.LITELLM_CONFIG || secrets.LITELLM_CONFIG }}
           LITELLM_CONFIG_YAML: ${{ vars.LITELLM_CONFIG_YAML || secrets.LITELLM_CONFIG_YAML }}
           LITELLM_API_KEY: ${{ secrets.LITELLM_API_KEY }}
