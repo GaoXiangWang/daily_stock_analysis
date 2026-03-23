@@ -157,11 +157,12 @@ class CustomWebhookSender:
         
         # 钉钉机器人
         if 'dingtalk' in url_lower or 'oapi.dingtalk.com' in url_lower:
+            content_with_keyword = f"{content}\n\n元辉叶明"
             return {
                 "msgtype": "markdown",
                 "markdown": {
                     "title": "股票分析报告",
-                    "text": content
+                    "text": content_with_keyword
                 }
             }
         
@@ -198,10 +199,10 @@ class CustomWebhookSender:
     
     def _send_dingtalk_chunked(self, url: str, content: str, max_bytes: int = 20000) -> bool:
         import time as _time
-
+        content_with_keyword = f"{content}\n\n元辉叶明"
         # 为 payload 开销预留空间，避免 body 超限
         budget = max(1000, max_bytes - 1500)
-        chunks = chunk_content_by_max_bytes(content, budget)
+        chunks = chunk_content_by_max_bytes(content_with_keyword, budget)
         if not chunks:
             return False
 
