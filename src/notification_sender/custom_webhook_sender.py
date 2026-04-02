@@ -8,6 +8,11 @@
 import logging
 import json
 import requests
+import time
+import hmac
+import hashlib
+import base64
+import urllib.parse
 
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes, slice_at_max_bytes
@@ -28,7 +33,10 @@ class CustomWebhookSender:
         self._custom_webhook_urls = getattr(config, 'custom_webhook_urls', []) or []
         self._custom_webhook_bearer_token = getattr(config, 'custom_webhook_bearer_token', None)
         self._webhook_verify_ssl = getattr(config, 'webhook_verify_ssl', True)
- 
+        
+        # ========== 钉钉加签配置（把你的加签密钥填在这里） ==========
+        self._dingtalk_secret = "SEC707f756ee904ca00ba391e232a644a63b62515e28a7d91f21e64698b09866cfc"
+
     def send_to_custom(self, content: str) -> bool:
         """
         推送消息到自定义 Webhook
@@ -95,7 +103,9 @@ class CustomWebhookSender:
         success_count = 0
         for i, url in enumerate(self._custom_webhook_urls):
             try:
-                if self._is_discord_webhook(url):
+                if self._is_dingtalk_webhook(url):
+                    logger.warning(f"自定义 Webhook {i+1}（钉钉）暂不支持图片发送，已跳过")
+                elif self._is_discord_webhook(url):
                     files = {"file": ("report.png", image_bytes, "image/png")}
                     data = {"content": "📈 股票智能分析报告"}
                     headers = {"User-Agent": "StockAnalysis/1.0"}
@@ -139,14 +149,44 @@ class CustomWebhookSender:
         # 支持 Bearer Token 认证（#51）
         if self._custom_webhook_bearer_token:
             headers['Authorization'] = f'Bearer {self._custom_webhook_bearer_token}'
+        
+        # ========== 钉钉加签逻辑 ==========
+        if self._is_dingtalk_webhook(url) and self._dingtalk_secret:
+            url = self._get_dingtalk_signed_url(url)
+        
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         response = requests.post(url, data=body, headers=headers, timeout=timeout, verify=self._webhook_verify_ssl)
+        
         if response.status_code == 200:
-            return True
+            result = response.json()
+            if result.get("errcode") == 0:
+                return True
+            else:
+                logger.error(f"钉钉返回错误: {result}")
+                return False
+            
         logger.error(f"自定义 Webhook 推送失败: HTTP {response.status_code}")
         logger.debug(f"响应内容: {response.text[:200]}")
         return False
     
+    def _get_dingtalk_signed_url(self, url: str) -> str:
+        """
+        钉钉加签算法：生成带签名的请求URL
+        """
+        timestamp = str(round(time.time() * 1000))
+        secret_enc = self._dingtalk_secret.encode('utf-8')
+        string_to_sign = f'{timestamp}\n{self._dingtalk_secret}'
+        string_to_sign_enc = string_to_sign.encode('utf-8')
+        hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+        sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+        
+        # 拼接签名到URL
+        if '?' in url:
+            new_url = f"{url}&timestamp={timestamp}&sign={sign}"
+        else:
+            new_url = f"{url}?timestamp={timestamp}&sign={sign}"
+        return new_url
+
     def _build_custom_webhook_payload(self, url: str, content: str) -> dict:
         """
         根据 URL 构建对应的 Webhook payload
@@ -197,8 +237,6 @@ class CustomWebhookSender:
         }
     
     def _send_dingtalk_chunked(self, url: str, content: str, max_bytes: int = 20000) -> bool:
-        import time as _time
-
         # 为 payload 开销预留空间，避免 body 超限
         budget = max(1000, max_bytes - 1500)
         chunks = chunk_content_by_max_bytes(content, budget)
@@ -230,7 +268,7 @@ class CustomWebhookSender:
                 logger.error(f"钉钉分批发送失败: 第 {idx+1}/{total} 批")
 
             if idx < total - 1:
-                _time.sleep(1)
+                time.sleep(1)
 
         return ok == total
 
@@ -246,4 +284,4 @@ class CustomWebhookSender:
         return (
             'discord.com/api/webhooks' in url_lower
             or 'discordapp.com/api/webhooks' in url_lower
-        )
+        )     
