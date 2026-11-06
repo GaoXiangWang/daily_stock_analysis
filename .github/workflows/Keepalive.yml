@@ -1,21 +1,19 @@
 name: Keepalive 保活任务
 on:
   schedule:
-    # UTC时间，每天0点执行一次检查（每天只检查，不是每天提交！只有超过45天无提交才会生成commit）
-    - cron: '0 0 * * *'
-  workflow_dispatch: # 支持手动点按钮触发测试
+    - cron: '0 0 1 * *'  # 每月1号跑一次，按需改
+  workflow_dispatch: # 支持手动触发
 
 jobs:
   keepalive:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write  # 必须给write权限，才能提交空commit
     steps:
-      - name: 保活Action
-        uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          # 45天阈值，距离上次提交超过45天才自动提交空commit，留足缓冲，避免触发60天冻结
-          days_before: 45
-          commit_message: "🤖 Auto keepalive commit: prevent github cron disable"
-          committer_username: github-actions[bot]
-          committer_email: github-actions[bot]@users.noreply.github.com
+      - uses: actions/checkout@v4
+      - name: 空提交保活
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive empty commit"
+          git push
